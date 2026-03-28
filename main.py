@@ -102,10 +102,11 @@ async def send_to_bot(cmd: CommandFrom1C):
 
     reply_markup = None
     if response_config.get("buttons"):
-        reply_markup = json.dumps({
-            "keyboard": response_config["buttons"],
-            "resize_keyboard": True
-        })
+        reply_markup_dict = {
+        "keyboard": response_config["buttons"],
+        "resize_keyboard": True
+        }
+    reply_markup_json = json.dumps(reply_markup_dict)
 
     if cmd.file_base64:
 
@@ -124,19 +125,25 @@ async def send_to_bot(cmd: CommandFrom1C):
         data = {
             "chat_id": cmd.chat_id,
             "caption": text, # В методах с файлами текст сообщения идет в поле caption
-            "reply_markup": reply_markup
         }
+
+        if reply_markup_json:
+            data["reply_markup"] = reply_markup_json
         
         tg_res = requests.post(url, data=data, files=files)
     else:
+        
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         payload = {
             "chat_id": cmd.chat_id,
             "text": text,
-            "reply_markup": reply_markup
         }
+
+        if reply_markup_json:
+            payload["reply_markup"] = reply_markup_dict
+
         tg_res = requests.post(url, json=payload)
 
     print(f"TG RESPONSE: {tg_res.status_code} - {tg_res.text}")
-    
+
     return {"status": "ok", "tg_code": tg_res.status_code}
