@@ -137,4 +137,6 @@ async def send_to_bot(cmd: CommandFrom1C):
         }
         tg_res = requests.post(url, json=payload)
 
+    print(f"TG RESPONSE: {tg_res.status_code} - {tg_res.text}")
+    
     return {"status": "ok", "tg_code": tg_res.status_code}
