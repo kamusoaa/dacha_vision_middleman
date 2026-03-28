@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi import BackgroundTasks
 from dictionary import BOT_RESPONSES
+from datetime import datetime
 
 app = FastAPI()
 
@@ -51,6 +52,10 @@ async def handle_webhook(request: Request):
     msg = update["message"]
     chat_id = msg["chat"]["id"]
     user_info = msg.get("from", {})
+
+    unix_date = msg.get("date")
+    dt_object = datetime.fromtimestamp(unix_date)
+    readable_date = dt_object.strftime("%Y-%m-%dT%H:%M:%S")
     
     payload = {
         "user_id": user_info.get("id"), 
@@ -58,7 +63,7 @@ async def handle_webhook(request: Request):
         "first_name": user_info.get("first_name"),
         "last_name": user_info.get("last_name") or "", 
         "chat_id": chat_id,
-        "date": msg.get("date"),
+        "date": readable_date,
         "type": "text",
         "text": msg.get("text", ""),
         "file_data": None or "",
