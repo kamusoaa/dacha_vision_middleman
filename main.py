@@ -1,4 +1,3 @@
-
 import os
 import base64
 import requests
@@ -23,7 +22,6 @@ class CommandFrom1C(BaseModel):
     file_name: str = ""
 
 def download_file_as_base64(file_id):
-
     path_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
     path_resp = requests.get(path_url).json()
     
@@ -90,7 +88,6 @@ async def handle_webhook(request: Request):
 
 @app.post("/send_to_bot")
 async def send_to_bot(cmd: CommandFrom1C):
-
     response_config = BOT_RESPONSES.get(cmd.command_code)
 
     if not response_config:
@@ -100,18 +97,18 @@ async def send_to_bot(cmd: CommandFrom1C):
     if cmd.extra_text:
         text += f"\n\n{cmd.extra_text}"
 
-    reply_markup = None
+    reply_markup_dict = None
+    reply_markup_json = None
+    
     if response_config.get("buttons"):
         reply_markup_dict = {
-        "keyboard": response_config["buttons"],
-        "resize_keyboard": True
+            "keyboard": response_config["buttons"],
+            "resize_keyboard": True
         }
-    reply_markup_json = json.dumps(reply_markup_dict)
+        reply_markup_json = json.dumps(reply_markup_dict)
 
     if cmd.file_base64:
-
         file_bytes = base64.b64decode(cmd.file_base64)
-
         file_io = io.BytesIO(file_bytes)
         file_io.name = cmd.file_name or "file.jpg"
 
@@ -124,7 +121,7 @@ async def send_to_bot(cmd: CommandFrom1C):
         files = {file_type: (file_io.name, file_io)}
         data = {
             "chat_id": cmd.chat_id,
-            "caption": text, # В методах с файлами текст сообщения идет в поле caption
+            "caption": text,
         }
 
         if reply_markup_json:
@@ -132,14 +129,13 @@ async def send_to_bot(cmd: CommandFrom1C):
         
         tg_res = requests.post(url, data=data, files=files)
     else:
-        
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         payload = {
             "chat_id": cmd.chat_id,
             "text": text,
         }
 
-        if reply_markup_json:
+        if reply_markup_dict:
             payload["reply_markup"] = reply_markup_dict
 
         tg_res = requests.post(url, json=payload)
