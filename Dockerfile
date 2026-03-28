@@ -11,7 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем основной файл с кодом
-COPY *.py .
+COPY *.py ./
 
 # Открываем порт 8000 (стандарт для FastAPI)
 EXPOSE 8000
