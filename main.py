@@ -22,7 +22,6 @@ class CommandFrom1C(BaseModel):
     extra_text: str = ""
     type: str = "text"
     show_buttons: bool = True
-    extra_text: str = ""
     file_base64: List[str] = []
     file_name: List[str] = []
 
