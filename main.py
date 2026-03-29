@@ -123,9 +123,17 @@ async def send_to_bot(cmd: CommandFrom1C):
         return {"status": "error", "message": f"Key '{lookup_key}' not found"}
 
     raw_text = response_config.get("text", "")
-    text = apply_params(raw_text, cmd.params)
-    if cmd.extra_text:
-        text += f"\n\n{cmd.extra_text}"
+    main_text = apply_params(raw_text, cmd.params) if raw_text else ""
+
+    message_parts = []
+    
+    if main_text.strip():
+        message_parts.append(main_text.strip())
+        
+    if cmd.extra_text and cmd.extra_text.strip():
+        message_parts.append(cmd.extra_text.strip())
+        
+    text = "\n\n".join(message_parts)
 
     reply_markup_dict = None
     if response_config.get("buttons"):
@@ -137,76 +145,73 @@ async def send_to_bot(cmd: CommandFrom1C):
     for target_id in cmd.chat_id:
         try:
             res = None
-            if cmd.type == "photo" and cmd.file_base64:
 
+            if cmd.type == "photo" and cmd.file_base64:
                 if len(cmd.file_base64) > 1:
                     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMediaGroup"
                     media, files = [], {}
                     
-                    for i, b64 in enumerate(cmd.file_base64[:150]):
-
-                        name = cmd.file_name[i] if i < len(cmd.file_name) else f"img_{i}.jpg"
+                    for i, b64 in enumerate(cmd.file_base64[:10]):
+                        name = cmd.file_name[i][:150] if i < len(cmd.file_name) else f"img_{i}.jpg"
                         files[name] = (name, io.BytesIO(base64.b64decode(b64)))
-                        item = {"type": "photo", "media": f"attach://{name}"}
+                        
+                        item = {
+                            "type": "photo", 
+                            "media": f"attach://{name}", 
+                            "parse_mode": "HTML"
+                        }
                         
                         if i == 0: 
                             item["caption"] = text[:1024]
                         media.append(item)
                     
                     res = requests.post(url, data={"chat_id": target_id, "media": json.dumps(media)}, files=files)
-                    
-                    if reply_markup_dict and cmd.show_buttons:
-                        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
-                                      json={"chat_id": target_id, "text": "...", "reply_markup": reply_markup_dict})
-                else:
 
+                else:
                     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-                    name = cmd.file_name[0] if cmd.file_name else "photo.jpg"
+                    name = cmd.file_name[0][:150] if cmd.file_name else "photo.jpg"
+
                     files = {"photo": (name, io.BytesIO(base64.b64decode(cmd.file_base64[0])))}
                     data = {"chat_id": target_id, "caption": text[:1024], "parse_mode": "HTML"}
-                    
-                    if reply_markup_dict: 
-                        data["reply_markup"] = json.dumps(reply_markup_dict)
 
+                    if reply_markup_dict and cmd.show_buttons: 
+                        data["reply_markup"] = json.dumps(reply_markup_dict)
                     res = requests.post(url, data=data, files=files)
 
             elif cmd.type == "document" and cmd.file_base64:
-
                 if len(cmd.file_base64) > 1:
                     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMediaGroup"
                     media, files = [], {}
 
-                    for i, b64 in enumerate(cmd.file_base64[:150]):
-                        name = cmd.file_name[i] if i < len(cmd.file_name) else f"doc_{i}.dat"
+                    for i, b64 in enumerate(cmd.file_base64[:10]):
+                        name = cmd.file_name[i][:150] if i < len(cmd.file_name) else f"doc_{i}.dat"
                         files[name] = (name, io.BytesIO(base64.b64decode(b64)))
-                        item = {"type": "document", "media": f"attach://{name}", "parse_mode": "HTML"}
+                        
+                        item = {
+                            "type": "document", 
+                            "media": f"attach://{name}", 
+                            "parse_mode": "HTML"
+                        }
                         
                         if i == 0: 
                             item["caption"] = text[:1024]
                         media.append(item)
                     
                     res = requests.post(url, data={"chat_id": target_id, "media": json.dumps(media)}, files=files)
-                    
-                    if reply_markup_dict and cmd.show_buttons:
-                        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
-                                      json={"chat_id": target_id, "text": "...", "reply_markup": reply_markup_dict})
                 else:
-
                     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
-                    name = cmd.file_name[0] if cmd.file_name else "file.dat"
+                    name = cmd.file_name[0][:150] if cmd.file_name else "file.dat"
                     files = {"document": (name, io.BytesIO(base64.b64decode(cmd.file_base64[0])))}
                     data = {"chat_id": target_id, "caption": text[:1024], "parse_mode": "HTML"}
-                    
-                    if reply_markup_dict: 
+                    if reply_markup_dict and cmd.show_buttons: 
                         data["reply_markup"] = json.dumps(reply_markup_dict)
                     res = requests.post(url, data=data, files=files)
 
             else:
-
                 url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
                 payload = {"chat_id": target_id, "text": text, "parse_mode": "HTML"}
-                
-                if reply_markup_dict: 
+
+                if reply_markup_dict and cmd.show_buttons: 
                     payload["reply_markup"] = reply_markup_dict
                 res = requests.post(url, json=payload)
 
@@ -217,7 +222,7 @@ async def send_to_bot(cmd: CommandFrom1C):
             time.sleep(0.05)
 
         except Exception as e:
-            print(f"❌ Ошибка при отправке на {target_id}: {str(e)}")
+            print(f"❌ Ошибка на {target_id}: {str(e)}")
             results.append({"chat_id": target_id, "status": "error", "error": str(e)})
 
     return {"status": "completed", "details": results}
