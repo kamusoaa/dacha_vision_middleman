@@ -19,9 +19,11 @@ URL_1C = os.getenv("URL_1C")
 class CommandFrom1C(BaseModel):
     chat_id: List[int]
     command_code: str
-    extra_text: str = ""
+    dictionary_key: Optional[str] = ""
+    params: List[str] = []
     type: str = "text"
     show_buttons: bool = True
+    extra_text: str = ""
     file_base64: List[str] = []
     file_name: List[str] = []
 
