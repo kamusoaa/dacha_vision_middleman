@@ -3,11 +3,13 @@ import base64
 import requests
 import json
 import io
+import time
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi import BackgroundTasks
 from dictionary import BOT_RESPONSES
 from datetime import datetime
+from typing import List, Optional
 
 app = FastAPI()
 
@@ -15,11 +17,14 @@ BOT_TOKEN = os.getenv("TOKEN")
 URL_1C = os.getenv("URL_1C")
 
 class CommandFrom1C(BaseModel):
-    chat_id: int
+    chat_id: List[int]
     command_code: str
     extra_text: str = ""
-    file_base64: str = ""
-    file_name: str = ""
+    type: str = "text"
+    show_buttons: bool = True
+    extra_text: str = ""
+    file_base64: List[str] = []
+    file_name: List[str] = []
 
 def download_file_as_base64(file_id):
     path_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
@@ -72,7 +77,7 @@ async def handle_webhook(request: Request):
         payload["type"] = "photo"
         file_id = msg["photo"][-1]["file_id"]
         payload["file_data"] = download_file_as_base64(file_id)
-        payload["file_name"] = f"photo_{file_id[:50]}.jpg"
+        payload["file_name"] = f"photo_{file_id[:150]}.jpg"
 
     elif "document" in msg:
         payload["type"] = "document"
@@ -88,58 +93,102 @@ async def handle_webhook(request: Request):
 
 @app.post("/send_to_bot")
 async def send_to_bot(cmd: CommandFrom1C):
-    response_config = BOT_RESPONSES.get(cmd.command_code)
 
+    lookup_key = cmd.dictionary_key if cmd.dictionary_key else cmd.command_code
+
+    response_config = BOT_RESPONSES.get(lookup_key)
     if not response_config:
-        return {"status": "error", "message": "Unknown command code"}
+        return {"status": "error", "message": f"Key '{lookup_key}' not found in dictionary"}
 
     text = response_config["text"]
     if cmd.extra_text:
         text += f"\n\n{cmd.extra_text}"
 
     reply_markup_dict = None
-    reply_markup_json = None
-    
     if response_config.get("buttons"):
-        reply_markup_dict = {
-            "keyboard": response_config["buttons"],
-            "resize_keyboard": True
-        }
-        reply_markup_json = json.dumps(reply_markup_dict)
+        reply_markup_dict = {"keyboard": response_config["buttons"], "resize_keyboard": True}
 
-    if cmd.file_base64:
-        file_bytes = base64.b64decode(cmd.file_base64)
-        file_io = io.BytesIO(file_bytes)
-        file_io.name = cmd.file_name or "file.jpg"
+    results = []
 
-        is_photo = file_io.name.lower().endswith(('.jpg', '.jpeg', '.png'))
-        method = "sendPhoto" if is_photo else "sendDocument"
-        file_type = "photo" if is_photo else "document"
+    for target_id in cmd.chat_id:
+        try:
 
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
-        
-        files = {file_type: (file_io.name, file_io)}
-        data = {
-            "chat_id": cmd.chat_id,
-            "caption": text,
-        }
+            if cmd.type == "photo" and cmd.file_base64:
+                if len(cmd.file_base64) > 1:
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMediaGroup"
+                    media, files = [], {}
 
-        if reply_markup_json:
-            data["reply_markup"] = reply_markup_json
-        
-        tg_res = requests.post(url, data=data, files=files)
-    else:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": cmd.chat_id,
-            "text": text,
-        }
+                    for i, b64 in enumerate(cmd.file_base64[:150]):
 
-        if reply_markup_dict:
-            payload["reply_markup"] = reply_markup_dict
+                        name = cmd.file_name[i] if i < len(cmd.file_name) else f"img_{i}.jpg"
+                        files[name] = (name, io.BytesIO(base64.b64decode(b64)))
+                        item = {"type": "photo", "media": f"attach://{name}"}
+                        
+                        if i == 0: 
+                            item["caption"] = text
+                        media.append(item)
+                    res = requests.post(url, data={"chat_id": target_id, "media": json.dumps(media)}, files=files)
 
-        tg_res = requests.post(url, json=payload)
+                    if reply_markup_dict and cmd.show_buttons:
+                        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
+                                      json={"chat_id": target_id, "text": "...", "reply_markup": reply_markup_dict})
+                else:
 
-    print(f"TG RESPONSE: {tg_res.status_code} - {tg_res.text}")
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+                    name = cmd.file_name[0] if cmd.file_name else "photo.jpg"
+                    files = {"photo": (name, io.BytesIO(base64.b64decode(cmd.file_base64[0])))}
+                    data = {"chat_id": target_id, "caption": text}
 
-    return {"status": "ok", "tg_code": tg_res.status_code}
+                    if reply_markup_dict: 
+                        data["reply_markup"] = json.dumps(reply_markup_dict)
+                    res = requests.post(url, data=data, files=files)
+
+            elif cmd.type == "document" and cmd.file_base64:
+
+                if len(cmd.file_base64) > 1:
+
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMediaGroup"
+                    media, files = [], {}
+
+                    for i, b64 in enumerate(cmd.file_base64[:150]):
+                        name = cmd.file_name[i] if i < len(cmd.file_name) else f"doc_{i}.dat"
+                        files[name] = (name, io.BytesIO(base64.b64decode(b64)))
+                        
+                        item = {"type": "document", "media": f"attach://{name}"}
+                        if i == 0: 
+                            item["caption"] = text
+                        media.append(item)
+
+                    res = requests.post(url, data={"chat_id": target_id, "media": json.dumps(media)}, files=files)
+
+                    if reply_markup_dict and cmd.show_buttons:
+                        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
+                                      json={"chat_id": target_id, "text": "...", "reply_markup": reply_markup_dict})
+                else:
+
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
+                    name = cmd.file_name[0] if cmd.file_name else "file.dat"
+                    files = {"document": (name, io.BytesIO(base64.b64decode(cmd.file_base64[0])))}
+                    data = {"chat_id": target_id, "caption": text}
+
+                    if reply_markup_dict: 
+                        data["reply_markup"] = json.dumps(reply_markup_dict)
+                    res = requests.post(url, data=data, files=files)
+
+            else:
+
+                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                payload = {"chat_id": target_id, "text": text}
+
+                if reply_markup_dict: 
+                    payload["reply_markup"] = reply_markup_dict
+                res = requests.post(url, json=payload)
+
+            results.append({"chat_id": target_id, "status": res.status_code})
+
+            time.sleep(0.04)
+
+        except Exception as e:
+            results.append({"chat_id": target_id, "status": "error", "error": str(e)})
+
+    return {"status": "completed", "details": results}
