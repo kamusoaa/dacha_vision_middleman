@@ -163,7 +163,7 @@ async def send_to_bot(cmd: CommandFrom1C):
                     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
                     name = cmd.file_name[0] if cmd.file_name else "photo.jpg"
                     files = {"photo": (name, io.BytesIO(base64.b64decode(cmd.file_base64[0])))}
-                    data = {"chat_id": target_id, "caption": text[:1024]}
+                    data = {"chat_id": target_id, "caption": text[:1024], "parse_mode": "HTML"}
                     
                     if reply_markup_dict: 
                         data["reply_markup"] = json.dumps(reply_markup_dict)
@@ -179,7 +179,7 @@ async def send_to_bot(cmd: CommandFrom1C):
                     for i, b64 in enumerate(cmd.file_base64[:150]):
                         name = cmd.file_name[i] if i < len(cmd.file_name) else f"doc_{i}.dat"
                         files[name] = (name, io.BytesIO(base64.b64decode(b64)))
-                        item = {"type": "document", "media": f"attach://{name}"}
+                        item = {"type": "document", "media": f"attach://{name}", "parse_mode": "HTML"}
                         
                         if i == 0: 
                             item["caption"] = text[:1024]
@@ -195,7 +195,7 @@ async def send_to_bot(cmd: CommandFrom1C):
                     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
                     name = cmd.file_name[0] if cmd.file_name else "file.dat"
                     files = {"document": (name, io.BytesIO(base64.b64decode(cmd.file_base64[0])))}
-                    data = {"chat_id": target_id, "caption": text[:1024]}
+                    data = {"chat_id": target_id, "caption": text[:1024], "parse_mode": "HTML"}
                     
                     if reply_markup_dict: 
                         data["reply_markup"] = json.dumps(reply_markup_dict)
@@ -204,7 +204,7 @@ async def send_to_bot(cmd: CommandFrom1C):
             else:
 
                 url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                payload = {"chat_id": target_id, "text": text}
+                payload = {"chat_id": target_id, "text": text, "parse_mode": "HTML"}
                 
                 if reply_markup_dict: 
                     payload["reply_markup"] = reply_markup_dict
