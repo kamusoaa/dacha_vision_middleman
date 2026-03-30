@@ -81,8 +81,8 @@ async def handle_webhook(request: Request):
     
     payload = {
         "user_id": user_info.get("id"), 
-        "username": user_info.get("username"), 
-        "first_name": user_info.get("first_name"),
+        "username": user_info.get("username") or "", 
+        "first_name": user_info.get("first_name") or "",
         "last_name": user_info.get("last_name") or "", 
         "chat_id": chat_id,
         "date": readable_date,
