@@ -66,6 +66,7 @@ async def ping():
 async def handle_webhook(request: Request):
 
     update = await request.json()
+    print(f"📩 Получен вебхук от ТГ: {update}") # Видим, что прислал Телеграм
     
     if "message" not in update:
         return {"status": "ignored"}
@@ -105,8 +106,11 @@ async def handle_webhook(request: Request):
 
     try:
         response = requests.post(URL_1C, json=payload, timeout=15)
+
+        print(f"🔌 Ответ от 1С: Статус {response.status_code} | Тело: {response.text}")
         return {"status": "sent_to_1c", "1c_response": response.status_code}
     except Exception as e:
+        print(f"❌ Ошибка при пересылке в 1С: {str(e)}")
         return {"status": "error", "reason": str(e)}
 
 @app.post("/send_to_bot")
