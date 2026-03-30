@@ -105,7 +105,7 @@ async def handle_webhook(request: Request):
         payload["file_name"] = doc.get("file_name", "file.dat")
 
     try:
-        response = requests.post(URL_1C, json=payload, timeout=15)
+        response = requests.post(URL_1C, json=payload, timeout=30)
 
         print(f"🔌 Ответ от 1С: Статус {response.status_code} | Тело: {response.text}")
         return {"status": "sent_to_1c", "1c_response": response.status_code}
